@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/router/app_router.dart';
 
 // ─────────────────────────────────────────────
 //  BRAND TOKENS
@@ -211,10 +213,7 @@ class _TeachingScreenState extends State<TeachingScreen>
     });
   }
 
-  void _onBack() {
-    // TODO: GoRouter.of(context).pop()
-    Navigator.of(context).maybePop();
-  }
+  void _onBack() => context.go(AppRoutes.modules);
 
   // ─────────────────────────────────────────
   //  BUILD
@@ -541,6 +540,32 @@ class _TeachingScreenState extends State<TeachingScreen>
               ),
             ),
 
+          // Finish lesson button
+          GestureDetector(
+            onTap: () => context.go(AppRoutes.modules),
+            child: Container(
+              height: 44,
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: _subjectAccent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _subjectAccent.withValues(alpha: 0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  'Finish Lesson ✅',
+                  style: GoogleFonts.nunito(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: _subjectAccent,
+                  ),
+                ),
+              ),
+            ),
+          ),
           // Input bar
           _buildDoubtInputBar(),
           const SizedBox(height: 16),

@@ -372,6 +372,22 @@ class _DiagnosticTestScreenState extends State<DiagnosticTestScreen>
             children: [
               Row(
                 children: [
+                  // Back button
+                  SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Material(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      elevation: 2,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () => context.go(AppRoutes.login),
+                        child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   // Floating mascot
                   AnimatedBuilder(
                     animation: _mascotY,

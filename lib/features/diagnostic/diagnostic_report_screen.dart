@@ -231,6 +231,33 @@ class _DiagnosticReportScreenState extends State<DiagnosticReportScreen>
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               children: [
+                // ── Back button
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: GestureDetector(
+                    onTap: () => context.go(AppRoutes.diagnostic),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        size: 16,
+                        color: Color(0xFF1A1A2E),
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 _buildHero(),
                 const SizedBox(height: 28),
@@ -526,54 +553,71 @@ class _DiagnosticReportScreenState extends State<DiagnosticReportScreen>
 
   // ─────── CTA BUTTON ────────
   Widget _buildCtaButton() {
-    return AnimatedBuilder(
-      animation: _shimmer,
-      builder: (_, __) {
-        return GestureDetector(
-          onTap: _onStart,
-          child: Container(
-            height: 60,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                begin: Alignment(_shimmer.value - 1, -0.3),
-                end: Alignment(_shimmer.value + 1, 0.3),
-                colors: [
-                  _C.green,
-                  const Color(0xFF6EE09A),
-                  Colors.white.withValues(alpha: 0.25),
-                  const Color(0xFF6EE09A),
-                  _C.green,
-                ],
-                stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: _C.green.withValues(alpha: 0.45),
-                  blurRadius: 22,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Start Learning!',
-                  style: GoogleFonts.nunito(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
+    return Column(
+      children: [
+        AnimatedBuilder(
+          animation: _shimmer,
+          builder: (_, __) {
+            return GestureDetector(
+              onTap: _onStart,
+              child: Container(
+                height: 60,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: LinearGradient(
+                    begin: Alignment(_shimmer.value - 1, -0.3),
+                    end: Alignment(_shimmer.value + 1, 0.3),
+                    colors: [
+                      _C.green,
+                      const Color(0xFF6EE09A),
+                      Colors.white.withValues(alpha: 0.25),
+                      const Color(0xFF6EE09A),
+                      _C.green,
+                    ],
+                    stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _C.green.withValues(alpha: 0.45),
+                      blurRadius: 22,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                const Text('🚀', style: TextStyle(fontSize: 20)),
-              ],
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Start Learning!',
+                      style: GoogleFonts.nunito(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('🚀', style: TextStyle(fontSize: 20)),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 14),
+        GestureDetector(
+          onTap: () => context.go(AppRoutes.parentControl),
+          child: Text(
+            'Parent Dashboard →',
+            style: GoogleFonts.nunito(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: _C.muted,
+              decoration: TextDecoration.underline,
             ),
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 }

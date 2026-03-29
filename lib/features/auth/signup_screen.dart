@@ -44,11 +44,6 @@ class _C {
 //  ENTRY POINT (for quick standalone testing)
 //  Remove this and wire via GoRouter when ready
 // ─────────────────────────────────────────────
-class SignupScreenEntry extends StatelessWidget {
-  const SignupScreenEntry({super.key});
-  @override
-  Widget build(BuildContext context) => const SignupScreen();
-}
 
 // ─────────────────────────────────────────────
 //  SIGNUP SCREEN
@@ -519,27 +514,25 @@ class _SignupScreenState extends State<SignupScreen>
   // ═══════════════════════════════════════════
   Widget _buildPage1() {
     const options = [
-      ('Boy',   '🧒', _C.blue),
-      ('Girl',  '👧', _C.coral),
-      ('Other', '🌈', _C.green),
+      ('Boy',  '🧒', _C.blue),
+      ('Girl', '👧', _C.coral),
     ];
     return _PageContent(
       title: _C.pageTitles[1],
       subtitle: _C.pageSubtitles[1],
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 16,
+        runSpacing: 16,
         children: options.map((opt) {
           final (label, emoji, color) = opt;
           final isSelected = _gender == label;
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: _GenderPill(
-              label: label,
-              emoji: emoji,
-              color: color,
-              isSelected: isSelected,
-              onTap: () => setState(() => _gender = label),
-            ),
+          return _GenderPill(
+            label: label,
+            emoji: emoji,
+            color: color,
+            isSelected: isSelected,
+            onTap: () => setState(() => _gender = label),
           );
         }).toList(),
       ),

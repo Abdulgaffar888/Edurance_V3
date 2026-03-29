@@ -304,6 +304,28 @@ class _ModulesScreenState extends State<ModulesScreen>
                 ),
               ),
             ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => context.go(AppRoutes.parentControl),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Text('👨\u200d👩\u200d👧', style: TextStyle(fontSize: 22)),
+                ),
+              ),
+            ),
           ],
         ),
       ),
