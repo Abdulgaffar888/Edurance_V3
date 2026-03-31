@@ -2,8 +2,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/signup_screen.dart';
 import '../../features/auth/login_screen.dart';
-import '../../features/diagnostic/diagnostic_test_screen.dart';
-import '../../features/diagnostic/diagnostic_report_screen.dart';
+
 import '../../features/learning/modules_screen.dart';
 import '../../features/learning/teaching_screen.dart';
 import '../../features/parent/parent_control_screen.dart';
@@ -15,8 +14,7 @@ import '../../features/parent/parent_control_screen.dart';
 abstract final class AppRoutes {
   static const signup         = '/signup';
   static const login          = '/login';
-  static const diagnostic     = '/diagnostic';
-  static const diagnosticReport = '/diagnostic-report';
+
   static const modules        = '/modules';
   static const teaching       = '/teaching';
   static const parentControl  = '/parent-control';
@@ -39,16 +37,7 @@ final appRouter = GoRouter(
       name: 'login',
       builder: (context, state) => const LoginScreen(),
     ),
-    GoRoute(
-      path: AppRoutes.diagnostic,
-      name: 'diagnostic',
-      builder: (context, state) => const DiagnosticTestScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.diagnosticReport,
-      name: 'diagnostic-report',
-      builder: (context, state) => const DiagnosticReportScreen(),
-    ),
+
     GoRoute(
       path: AppRoutes.modules,
       name: 'modules',

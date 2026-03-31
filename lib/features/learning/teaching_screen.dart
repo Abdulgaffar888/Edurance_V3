@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../core/router/app_router.dart';
+import 'letter_lesson_model.dart';
 
 // ─────────────────────────────────────────────
 //  BRAND TOKENS
@@ -12,84 +14,15 @@ class _C {
   static const coral  = Color(0xFFFF6B6B);
   static const green  = Color(0xFF56CF7E);
   static const bg     = Color(0xFFFFF9F0);
-  static const dark   = Color(0xFF1A1A2E);
+  static const dark   = Color(0xFF2D2D3A);
   static const muted  = Color(0xFF9E9EA8);
+  static const white  = Colors.white;
 }
 
 // ─────────────────────────────────────────────
-//  HARDCODED LESSON DATA
+//  PHASE ENUM
 // ─────────────────────────────────────────────
-class _LessonData {
-  final String title;
-  final String body;
-  final String emoji;
-
-  const _LessonData({
-    required this.title,
-    required this.body,
-    required this.emoji,
-  });
-}
-
-const _lessonTitle   = 'Plants & Their Parts 🌱';
-const _lessonSubject = 'Science';
-const _subjectEmoji  = '🔬';
-const _subjectAccent = _C.green;
-const _subjectGradient = [Color(0xFF7DDFAA), Color(0xFF56CF7E)];
-
-const _lessonSections = <_LessonData>[
-  _LessonData(
-    emoji: '🌿',
-    title: 'What is a Plant?',
-    body:
-        'Plants are living things that grow in soil and make their own food using sunlight! '
-        'You can find plants everywhere — in your garden, in the park, even in your kitchen! '
-        'Did you know there are over 3,00,000 different types of plants on Earth? 🌍\n\n'
-        'Plants are very important because they give us food to eat, air to breathe, and '
-        'shade to rest under. Your mango tree, the grass in your garden, the tulsi plant '
-        'on your balcony — they are all plants!',
-  ),
-  _LessonData(
-    emoji: '🌱',
-    title: 'Parts of a Plant',
-    body:
-        'Every plant has different parts, and each part has a special job to do:\n\n'
-        '🫚  Roots — They hold the plant in the soil and drink up water and minerals. '
-        'Roots are like the plant\'s mouth!\n\n'
-        '🪵  Stem — The stem carries water from the roots to the leaves. '
-        'Think of it as the plant\'s straw!\n\n'
-        '🍃  Leaves — Leaves use sunlight, water, and air to make food for the plant. '
-        'This is called photosynthesis. Leaves are the plant\'s kitchen!\n\n'
-        '🌸  Flowers — Flowers help plants make seeds so new plants can grow. '
-        'They are also very pretty and smell wonderful!\n\n'
-        '🍎  Fruits — Fruits grow from flowers and carry seeds inside. '
-        'We eat many fruits like mangoes, bananas, and apples!',
-  ),
-  _LessonData(
-    emoji: '☀️',
-    title: 'How Do Plants Make Food?',
-    body:
-        'Plants are amazing chefs! They make their own food using three things:\n\n'
-        '1. 💧 Water from the soil (absorbed by roots)\n'
-        '2. ☀️ Sunlight (captured by leaves)\n'
-        '3. 💨 Carbon dioxide from the air (breathed in through tiny holes in leaves)\n\n'
-        'This process is called PHOTOSYNTHESIS (say it: fo-to-SIN-the-sis). '
-        'As a result, plants also release oxygen — the air we breathe! '
-        'So every time you breathe in, you should say thank you to a plant! 🙏',
-  ),
-  _LessonData(
-    emoji: '🌻',
-    title: 'Fun Plant Facts!',
-    body:
-        '⚡ The fastest-growing plant is bamboo — it can grow 91 cm in just ONE day!\n\n'
-        '🎋 The world\'s oldest tree is nearly 5,000 years old.\n\n'
-        '🌊 Some plants like water lily float on water!\n\n'
-        '🍫 Chocolate comes from the cacao plant. So plants give us chocolate too!\n\n'
-        '🌵 Cactus plants can survive without water for years in the desert.\n\n'
-        'Remember: Plants are our best friends. Take care of them and they will '
-        'take care of us! 💚',
-  ),
-];
+enum _Phase { intro, mcq, feedback }
 
 // ─────────────────────────────────────────────
 //  TEACHING SCREEN
@@ -102,118 +35,67 @@ class TeachingScreen extends StatefulWidget {
 }
 
 class _TeachingScreenState extends State<TeachingScreen>
-    with TickerProviderStateMixin {
-  final _doubtController  = TextEditingController();
-  final _doubtFocus       = FocusNode();
-  final _contentScroll    = ScrollController();
-  bool _hasDoubtText      = false;
-  bool _isSending         = false;
+    with SingleTickerProviderStateMixin {
+  // ── Lesson state
+  int    _letterIndex  = 0;
+  _Phase _phase        = _Phase.intro;
+  int?   _selectedOption; // null until user taps in MCQ phase
 
-  // Animations
-  late final AnimationController _cardEntrance;
-  late final Animation<double>   _cardSlide;
-  late final Animation<double>   _cardFade;
+  LetterLesson get _lesson => kLetterLessons[_letterIndex];
+  bool get _isCorrect =>
+      _selectedOption != null && _selectedOption == _lesson.correctIndex;
+  bool get _isLastLetter => _letterIndex == kLetterLessons.length - 1;
 
-  late final AnimationController _mascotBounce;
-  late final Animation<double>   _mascotY;
+  // ── Avatar AnimatedSwitcher key — forces rebuild on every phase/letter change
+  Object _avatarKey = Object();
 
-  late final AnimationController _sendBtnPulse;
-  late final Animation<double>   _sendBtnScale;
-
-  // Chat-style doubt bubbles (local only)
-  final _doubts = <String>[];
+  // ── Subtle bounce for the avatar in intro
+  late final AnimationController _bounceCtrl;
+  late final Animation<double>   _bounceY;
 
   @override
   void initState() {
     super.initState();
-
-    _cardEntrance = AnimationController(
+    _bounceCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 550),
-    )..forward();
-    _cardSlide = Tween<double>(begin: 60, end: 0).animate(
-      CurvedAnimation(parent: _cardEntrance, curve: Curves.easeOutCubic),
-    );
-    _cardFade = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _cardEntrance, curve: Curves.easeIn),
-    );
-
-    _mascotBounce = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 1100),
     )..repeat(reverse: true);
-    _mascotY = Tween<double>(begin: 0, end: -6).animate(
-      CurvedAnimation(parent: _mascotBounce, curve: Curves.easeInOut),
+    _bounceY = Tween<double>(begin: 0, end: -8).animate(
+      CurvedAnimation(parent: _bounceCtrl, curve: Curves.easeInOut),
     );
-
-    _sendBtnPulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    )..repeat(reverse: true);
-    _sendBtnScale = Tween<double>(begin: 1.0, end: 1.06).animate(
-      CurvedAnimation(parent: _sendBtnPulse, curve: Curves.easeInOut),
-    );
-
-    _doubtController.addListener(() {
-      final hasText = _doubtController.text.trim().isNotEmpty;
-      if (hasText != _hasDoubtText) setState(() => _hasDoubtText = hasText);
-    });
-
-    _doubtFocus.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
-    _doubtController.dispose();
-    _doubtFocus.dispose();
-    _contentScroll.dispose();
-    _cardEntrance.dispose();
-    _mascotBounce.dispose();
-    _sendBtnPulse.dispose();
+    _bounceCtrl.dispose();
     super.dispose();
   }
 
-  void _onAskDoubt(String text) {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty) return;
-
+  // ── Phase transitions
+  void _goToMcq() {
     setState(() {
-      _isSending = true;
-      _doubts.add(trimmed);
-    });
-    _doubtController.clear();
-    FocusScope.of(context).unfocus();
-
-    // Simulate AI "thinking" (TODO: wire to Gemini API)
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (!mounted) return;
-      setState(() => _isSending = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Text('🤖', style: TextStyle(fontSize: 18)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Great question! AI response coming soon…',
-                  style: GoogleFonts.nunito(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: _subjectAccent,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      _phase        = _Phase.mcq;
+      _avatarKey    = Object();
     });
   }
 
-  void _onBack() => context.go(AppRoutes.modules);
+  void _selectOption(int index) {
+    if (_phase != _Phase.mcq) return;
+    setState(() {
+      _selectedOption = index;
+      _phase          = _Phase.feedback;
+      _avatarKey      = Object();
+    });
+  }
+
+  void _goToNextLetter() {
+    setState(() {
+      if (!_isLastLetter) _letterIndex++;
+      _phase          = _Phase.intro;
+      _selectedOption = null;
+      _avatarKey      = Object();
+    });
+  }
 
   // ─────────────────────────────────────────
   //  BUILD
@@ -222,560 +104,95 @@ class _TeachingScreenState extends State<TeachingScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _C.bg,
-      resizeToAvoidBottomInset: true,
-      body: Column(
-        children: [
-          _buildTopBar(),
-          Expanded(child: _buildBody()),
-        ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildTopBar(),
+            Expanded(
+              child: Column(
+                children: [
+                  // ── Avatar + speech bubble  (~top 38%)
+                  _buildAvatarSection(),
+                  // ── Phase content (fills remaining space)
+                  Expanded(child: _buildPhaseContent()),
+                  // ── Progress dots
+                  _buildProgressDots(),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   // ─────── TOP BAR ────────
   Widget _buildTopBar() {
+    final progress = (_letterIndex + 1) / kLetterLessons.length;
+
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: _subjectGradient,
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 20, 14),
-          child: Row(
-            children: [
-              // Back button
-              SizedBox(
-                width: 48,
-                height: 48,
-                child: Material(
-                  color: Colors.white.withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(14),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: _onBack,
-                    child: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              // Subject badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.22),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _subjectEmoji,
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _lessonSubject,
-                      style: GoogleFonts.nunito(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              // Lesson title
-              Expanded(
-                child: Text(
-                  _lessonTitle,
-                  style: GoogleFonts.nunito(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Floating mascot
-              AnimatedBuilder(
-                animation: _mascotY,
-                builder: (_, child) => Transform.translate(
-                  offset: Offset(0, _mascotY.value),
-                  child: child,
-                ),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: _subjectAccent.withValues(alpha: 0.4),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Text('🔬', style: TextStyle(fontSize: 20)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ─────── BODY ────────
-  Widget _buildBody() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final totalH = constraints.maxHeight;
-
-        return Column(
-          children: [
-            // Content card — 65%
-            SizedBox(
-              height: totalH * 0.65,
-              child: _buildContentCard(),
-            ),
-            // Doubt area — 35%
-            Expanded(child: _buildDoubtArea()),
-          ],
-        );
-      },
-    );
-  }
-
-  // ─────── CONTENT CARD (65%) ────────
-  Widget _buildContentCard() {
-    return AnimatedBuilder(
-      animation: _cardEntrance,
-      builder: (_, child) => Opacity(
-        opacity: _cardFade.value,
-        child: Transform.translate(
-          offset: Offset(0, _cardSlide.value),
-          child: child,
-        ),
-      ),
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: _subjectAccent.withValues(alpha: 0.18),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: Column(
-            children: [
-              // Card top strip
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFFDCFAEB), Color(0xFFF0FFF5)],
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _subjectAccent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: _subjectAccent.withValues(alpha: 0.3),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Text(
-                        '📘 Lesson',
-                        style: GoogleFonts.nunito(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: _subjectAccent,
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '${_lessonSections.length} sections',
-                      style: GoogleFonts.nunito(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: _C.muted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Scrollable lesson content
-              Expanded(
-                child: ListView.separated(
-                  controller: _contentScroll,
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                  itemCount: _lessonSections.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 24),
-                  itemBuilder: (_, i) => _LessonSection(
-                    section: _lessonSections[i],
-                    index: i,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ─────── DOUBT AREA (35%) ────────
-  Widget _buildDoubtArea() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Divider label
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                Container(
-                  height: 2,
-                  width: 24,
-                  decoration: BoxDecoration(
-                    color: _subjectAccent.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Got a doubt? Ask away! 🙋',
-                  style: GoogleFonts.nunito(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: _C.muted,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Container(
-                    height: 2,
-                    decoration: BoxDecoration(
-                      color: _subjectAccent.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Recent doubts (scrollable mini feed)
-          if (_doubts.isNotEmpty)
-            Expanded(
-              child: ListView.builder(
-                reverse: true,
-                padding: const EdgeInsets.only(bottom: 8),
-                itemCount: _doubts.length,
-                itemBuilder: (_, i) {
-                  final idx = _doubts.length - 1 - i;
-                  return _DoubtBubble(text: _doubts[idx]);
-                },
-              ),
-            )
-          else
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '💬',
-                      style: const TextStyle(fontSize: 32),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'No doubts yet — ask anything!',
-                      style: GoogleFonts.nunito(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: _C.muted.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-          // Finish lesson button
-          GestureDetector(
-            onTap: () => context.go(AppRoutes.modules),
-            child: Container(
-              height: 44,
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: _subjectAccent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: _subjectAccent.withValues(alpha: 0.3),
-                  width: 1.5,
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  'Finish Lesson ✅',
-                  style: GoogleFonts.nunito(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: _subjectAccent,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // Input bar
-          _buildDoubtInputBar(),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDoubtInputBar() {
-    final focused = _doubtFocus.hasFocus;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      height: 56,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: focused
-              ? _C.coral
-              : _C.coral.withValues(alpha: 0.2),
-          width: focused ? 2.5 : 2.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: _C.coral.withValues(alpha: focused ? 0.18 : 0.06),
-            blurRadius: focused ? 16 : 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+      color: _C.bg,
+      padding: const EdgeInsets.fromLTRB(12, 10, 20, 10),
       child: Row(
         children: [
-          const SizedBox(width: 16),
+          // Back button
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: Material(
+              color: _C.green.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => context.go(AppRoutes.modules),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: _C.green,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Title + progress bar
           Expanded(
-            child: TextField(
-              controller: _doubtController,
-              focusNode: _doubtFocus,
-              textInputAction: TextInputAction.send,
-              onSubmitted: _onAskDoubt,
-              style: GoogleFonts.nunito(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: _C.dark,
-              ),
-              decoration: InputDecoration(
-                hintText: 'Ask a doubt... 💬',
-                hintStyle: GoogleFonts.nunito(
-                  fontSize: 14,
-                  color: _C.muted,
-                  fontWeight: FontWeight.w600,
-                ),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Send button
-          GestureDetector(
-            onTap: _hasDoubtText ? () => _onAskDoubt(_doubtController.text) : null,
-            child: AnimatedBuilder(
-              animation: _sendBtnScale,
-              builder: (_, child) => Transform.scale(
-                scale: _hasDoubtText ? _sendBtnScale.value : 1.0,
-                child: child,
-              ),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                width: 44,
-                height: 44,
-                margin: const EdgeInsets.symmetric(horizontal: 6),
-                decoration: BoxDecoration(
-                  gradient: _hasDoubtText
-                      ? const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFFFF8F8F), _C.coral],
-                        )
-                      : LinearGradient(
-                          colors: [
-                            _C.muted.withValues(alpha: 0.15),
-                            _C.muted.withValues(alpha: 0.10),
-                          ],
-                        ),
-                  borderRadius: BorderRadius.circular(13),
-                  boxShadow: _hasDoubtText
-                      ? [
-                          BoxShadow(
-                            color: _C.coral.withValues(alpha: 0.4),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : [],
-                ),
-                child: _isSending
-                    ? Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white.withValues(alpha: 0.8),
-                        ),
-                      )
-                    : Icon(
-                        Icons.send_rounded,
-                        color: _hasDoubtText
-                            ? Colors.white
-                            : _C.muted.withValues(alpha: 0.35),
-                        size: 20,
-                      ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-//  LESSON SECTION WIDGET
-// ─────────────────────────────────────────────
-class _LessonSection extends StatelessWidget {
-  final _LessonData section;
-  final int index;
-
-  const _LessonSection({required this.section, required this.index});
-
-  // Per-section accent colour cycling through brand palette
-  static const _sectionColors = [_C.green, _C.blue, _C.yellow, _C.coral];
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _sectionColors[index % _sectionColors.length];
-
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: Duration(milliseconds: 400 + index * 120),
-      curve: Curves.easeOutCubic,
-      builder: (_, v, child) => Opacity(
-        opacity: v,
-        child: Transform.translate(
-          offset: Offset(0, 20 * (1 - v)),
-          child: child,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Section header
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: color.withValues(alpha: 0.3),
-                    width: 1.5,
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    section.emoji,
-                    style: const TextStyle(fontSize: 20),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  section.title,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'English – Alphabets',
                   style: GoogleFonts.nunito(
-                    fontSize: 17,
+                    fontSize: 15,
                     fontWeight: FontWeight.w900,
                     color: _C.dark,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Accent left border + body text
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  width: 4,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    section.body,
-                    style: GoogleFonts.nunito(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF3D3D52),
-                      height: 1.65,
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 7,
+                          backgroundColor: _C.green.withValues(alpha: 0.15),
+                          valueColor:
+                              const AlwaysStoppedAnimation<Color>(_C.green),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${_letterIndex + 1}/26',
+                      style: GoogleFonts.nunito(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: _C.green,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -784,61 +201,496 @@ class _LessonSection extends StatelessWidget {
       ),
     );
   }
-}
 
-// ─────────────────────────────────────────────
-//  DOUBT BUBBLE
-// ─────────────────────────────────────────────
-class _DoubtBubble extends StatelessWidget {
-  final String text;
-  const _DoubtBubble({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
+  // ─────── AVATAR + SPEECH BUBBLE ────────
+  Widget _buildAvatarSection() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: Column(
         children: [
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: _C.coral.withValues(alpha: 0.10),
-                borderRadius: const BorderRadius.only(
-                  topLeft:     Radius.circular(16),
-                  topRight:    Radius.circular(16),
-                  bottomLeft:  Radius.circular(16),
-                  bottomRight: Radius.circular(4),
-                ),
-                border: Border.all(
-                  color: _C.coral.withValues(alpha: 0.2),
-                  width: 1.5,
-                ),
+          // Avatar circle with AnimatedSwitcher
+          AnimatedBuilder(
+            animation: _bounceY,
+            builder: (_, child) => Transform.translate(
+              offset: Offset(0, _phase == _Phase.intro ? _bounceY.value : 0),
+              child: child,
+            ),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 320),
+              transitionBuilder: (child, anim) => ScaleTransition(
+                scale: anim,
+                child: FadeTransition(opacity: anim, child: child),
               ),
-              child: Text(
-                text,
-                style: GoogleFonts.nunito(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: _C.dark,
-                ),
-              ),
+              child: _buildAvatarCircle(),
             ),
           ),
-          const SizedBox(width: 8),
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: _C.coral.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: const Center(
-              child: Text('👧', style: TextStyle(fontSize: 16)),
+          const SizedBox(height: 12),
+          // Speech bubble
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 280),
+            child: _SpeechBubble(
+              key: ValueKey(_avatarKey),
+              text: _speechBubbleText(),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarCircle() {
+    final String content;
+    final bool isEmoji;
+
+    switch (_phase) {
+      case _Phase.intro:
+        content = _lesson.letter;
+        isEmoji = false;
+        break;
+      case _Phase.mcq:
+        content = _lesson.emoji;
+        isEmoji = true;
+        break;
+      case _Phase.feedback:
+        content = _isCorrect ? '✅' : '❌';
+        isEmoji = true;
+        break;
+    }
+
+    final Color shadowColor = _phase == _Phase.feedback
+        ? (_isCorrect ? _C.green : _C.coral)
+        : _C.coral;
+
+    return Container(
+      key: ValueKey('$_letterIndex-$_phase'),
+      width: 120,
+      height: 120,
+      decoration: BoxDecoration(
+        color: _C.white,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: shadowColor.withValues(alpha: 0.35),
+            blurRadius: 28,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Center(
+        child: isEmoji
+            ? Text(content, style: const TextStyle(fontSize: 64))
+            : Text(
+                content,
+                style: GoogleFonts.nunito(
+                  fontSize: 72,
+                  fontWeight: FontWeight.w900,
+                  color: _C.coral,
+                  height: 1.0,
+                ),
+              ),
+      ),
+    );
+  }
+
+  String _speechBubbleText() {
+    switch (_phase) {
+      case _Phase.intro:
+        return 'This is the letter ${_lesson.letter}! Say it with me… ${_lesson.pronunciation}!';
+      case _Phase.mcq:
+        return _lesson.mcqQuestion;
+      case _Phase.feedback:
+        return _isCorrect
+            ? 'Amazing! 🌟 You got it right!'
+            : _lesson.altExplanation;
+    }
+  }
+
+  // ─────── PHASE CONTENT ────────
+  Widget _buildPhaseContent() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      transitionBuilder: (child, anim) => SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0.08, 0),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
+        child: FadeTransition(opacity: anim, child: child),
+      ),
+      child: KeyedSubtree(
+        key: ValueKey('$_letterIndex-$_phase'),
+        child: switch (_phase) {
+          _Phase.intro    => _buildIntroContent(),
+          _Phase.mcq      => _buildMcqContent(),
+          _Phase.feedback => _buildFeedbackContent(),
+        },
+      ),
+    );
+  }
+
+  // ── INTRO ──
+  Widget _buildIntroContent() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      child: Column(
+        children: [
+          // Emoji + word card
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: _C.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: _C.coral.withValues(alpha: 0.12),
+                    blurRadius: 20,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _lesson.emoji,
+                    style: const TextStyle(fontSize: 64),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _lesson.word,
+                    style: GoogleFonts.nunito(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: _C.dark,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${_lesson.letter} is for ${_lesson.word}',
+                    style: GoogleFonts.nunito(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: _C.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // CTA button
+          _GreenButton(
+            label: "I got it! Let's answer →",
+            onTap: _goToMcq,
+          ),
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+
+  // ── MCQ ──
+  Widget _buildMcqContent() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _lesson.mcqQuestion,
+            style: GoogleFonts.nunito(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: _C.dark,
+            ),
+          ),
+          const SizedBox(height: 14),
+          ...List.generate(_lesson.options.length, (i) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _OptionButton(
+                label: _lesson.options[i],
+                state: _OptionState.idle,
+                onTap: () => _selectOption(i),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  // ── FEEDBACK ──
+  Widget _buildFeedbackContent() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _lesson.mcqQuestion,
+            style: GoogleFonts.nunito(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: _C.dark,
+            ),
+          ),
+          const SizedBox(height: 14),
+          ...List.generate(_lesson.options.length, (i) {
+            final _OptionState state;
+            if (i == _lesson.correctIndex) {
+              state = _OptionState.correct;
+            } else if (i == _selectedOption) {
+              state = _OptionState.wrong;
+            } else {
+              state = _OptionState.idle;
+            }
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _OptionButton(
+                label: _lesson.options[i],
+                state: state,
+                onTap: null, // locked in feedback phase
+              ),
+            );
+          }),
+          const Spacer(),
+          // Next / Finish button
+          _isLastLetter
+              ? _GreenButton(
+                  label: "I'm done! 🎉",
+                  onTap: () => context.go(AppRoutes.modules),
+                )
+              : _GreenButton(
+                  label: 'Next Letter →',
+                  onTap: _goToNextLetter,
+                ),
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+
+  // ─────── PROGRESS DOTS ────────
+  Widget _buildProgressDots() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(kLetterLessons.length, (i) {
+            final isCurrent   = i == _letterIndex;
+            final isCompleted = i < _letterIndex;
+
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width:  isCurrent ? 20 : 8,
+              height: isCurrent ? 10 : 8,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: isCurrent
+                    ? _C.coral
+                    : isCompleted
+                        ? _C.green
+                        : _C.muted.withValues(alpha: 0.25),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  SPEECH BUBBLE WIDGET
+// ─────────────────────────────────────────────
+class _SpeechBubble extends StatelessWidget {
+  final String text;
+  const _SpeechBubble({super.key, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: _C.white,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: _C.muted.withValues(alpha: 0.18),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunito(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: _C.dark,
+              height: 1.45,
+            ),
+          ),
+        ),
+        // Triangle pointer below the bubble
+        CustomPaint(
+          size: const Size(20, 10),
+          painter: _TrianglePainter(color: _C.white),
+        ),
+      ],
+    );
+  }
+}
+
+class _TrianglePainter extends CustomPainter {
+  final Color color;
+  const _TrianglePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    final path  = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_TrianglePainter old) => old.color != color;
+}
+
+// ─────────────────────────────────────────────
+//  OPTION BUTTON
+// ─────────────────────────────────────────────
+enum _OptionState { idle, correct, wrong }
+
+class _OptionButton extends StatelessWidget {
+  final String       label;
+  final _OptionState state;
+  final VoidCallback? onTap;
+
+  const _OptionButton({
+    required this.label,
+    required this.state,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg, border, textColor;
+
+    switch (state) {
+      case _OptionState.correct:
+        bg        = _C.green.withValues(alpha: 0.12);
+        border    = _C.green;
+        textColor = _C.green;
+        break;
+      case _OptionState.wrong:
+        bg        = _C.coral.withValues(alpha: 0.10);
+        border    = _C.coral;
+        textColor = _C.coral;
+        break;
+      case _OptionState.idle:
+        bg        = _C.white;
+        border    = _C.muted.withValues(alpha: 0.35);
+        textColor = _C.dark;
+        break;
+    }
+
+    final Widget trailing = switch (state) {
+      _OptionState.correct => const Text('✅', style: TextStyle(fontSize: 18)),
+      _OptionState.wrong   => const Text('❌', style: TextStyle(fontSize: 18)),
+      _OptionState.idle    => const SizedBox.shrink(),
+    };
+
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          height: 56,
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: border, width: 1.8),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: GoogleFonts.nunito(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: textColor,
+                  ),
+                ),
+              ),
+              trailing,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  GREEN GRADIENT BUTTON
+// ─────────────────────────────────────────────
+class _GreenButton extends StatelessWidget {
+  final String       label;
+  final VoidCallback onTap;
+
+  const _GreenButton({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        height: 56,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF7DDFAA), _C.green],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: _C.green.withValues(alpha: 0.40),
+              blurRadius: 18,
+              offset: const Offset(0, 7),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.nunito(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: _C.white,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ),
       ),
     );
   }

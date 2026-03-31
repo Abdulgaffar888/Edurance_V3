@@ -198,7 +198,7 @@ class _SignupScreenState extends State<SignupScreen>
 
   void _onSubmit() {
     // TODO: wire to Supabase signup before navigating
-    context.go(AppRoutes.diagnostic);
+    context.go(AppRoutes.modules);
   }
 
   // ─────────────────────────────────────────
