@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/router/app_router.dart';
+import '../../services/ai/openai_service.dart';
 import 'letter_lesson_model.dart';
 
 // ─────────────────────────────────────────────
@@ -37,25 +39,32 @@ class TeachingScreen extends StatefulWidget {
 class _TeachingScreenState extends State<TeachingScreen>
     with SingleTickerProviderStateMixin {
   // ── Lesson state
-  int    _letterIndex  = 0;
-  _Phase _phase        = _Phase.intro;
-  int?   _selectedOption; // null until user taps in MCQ phase
+  int    _letterIndex    = 0;
+  _Phase _phase          = _Phase.intro;
+  int?   _selectedOption;
+
+// ── TTS
+  final FlutterTts _tts = FlutterTts();
+  bool _ttsReady = false;
+
+  // ── AI explanation state
+  String? _aiExplanation;
+  bool _loadingExplanation = false;
 
   LetterLesson get _lesson => kLetterLessons[_letterIndex];
   bool get _isCorrect =>
       _selectedOption != null && _selectedOption == _lesson.correctIndex;
   bool get _isLastLetter => _letterIndex == kLetterLessons.length - 1;
 
-  // ── Avatar AnimatedSwitcher key — forces rebuild on every phase/letter change
   Object _avatarKey = Object();
 
-  // ── Subtle bounce for the avatar in intro
   late final AnimationController _bounceCtrl;
   late final Animation<double>   _bounceY;
 
   @override
   void initState() {
     super.initState();
+
     _bounceCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1100),
@@ -63,10 +72,49 @@ class _TeachingScreenState extends State<TeachingScreen>
     _bounceY = Tween<double>(begin: 0, end: -8).animate(
       CurvedAnimation(parent: _bounceCtrl, curve: Curves.easeInOut),
     );
+
+    _initTts();
+  }
+
+  Future<void> _initTts() async {
+    await _tts.setLanguage('en-IN');
+    await _tts.setSpeechRate(0.45);   // slow and clear for children
+    await _tts.setVolume(1.0);
+    await _tts.setPitch(1.2);         // slightly higher pitch, friendlier
+    setState(() => _ttsReady = true);
+    // Speak the first letter on load
+    await _speakIntro();
+  }
+
+  Future<void> _speak(String text) async {
+    await _tts.stop();
+    await _tts.speak(text);
+  }
+
+  Future<void> _speakIntro() async {
+    final l = _lesson;
+    await _speak(
+      'This is the letter ${l.letter}. '
+      'Say it with me... ${l.pronunciation}! '
+      '${l.letter} is for ${l.word}.',
+    );
+  }
+
+  Future<void> _speakMcq() async {
+    await _speak(_lesson.mcqQuestion);
+  }
+
+  Future<void> _speakFeedback() async {
+    if (_isCorrect) {
+      await _speak('Amazing! You got it right!');
+    } else {
+      await _speak(_lesson.altExplanation);
+    }
   }
 
   @override
   void dispose() {
+    _tts.stop();
     _bounceCtrl.dispose();
     super.dispose();
   }
@@ -74,18 +122,51 @@ class _TeachingScreenState extends State<TeachingScreen>
   // ── Phase transitions
   void _goToMcq() {
     setState(() {
-      _phase        = _Phase.mcq;
-      _avatarKey    = Object();
+      _phase     = _Phase.mcq;
+      _avatarKey = Object();
     });
+    _speakMcq();
   }
 
-  void _selectOption(int index) {
+void _selectOption(int index) {
     if (_phase != _Phase.mcq) return;
     setState(() {
       _selectedOption = index;
       _phase          = _Phase.feedback;
       _avatarKey      = Object();
+      _aiExplanation  = null;
     });
+
+    final isCorrect = index == _lesson.correctIndex;
+
+    if (isCorrect) {
+      // Correct — just speak immediately
+      _speakFeedback();
+    } else {
+      // Wrong — fetch AI explanation first, then speak it
+      _fetchAndSpeakExplanation(index);
+    }
+  }
+
+  Future<void> _fetchAndSpeakExplanation(int wrongIndex) async {
+    setState(() => _loadingExplanation = true);
+
+    final explanation = await OpenAIService.getWrongAnswerExplanation(
+      letter: _lesson.letter,
+      correctWord: _lesson.word,
+      wrongWord: _lesson.options[wrongIndex],
+      question: _lesson.mcqQuestion,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _aiExplanation     = explanation;
+      _loadingExplanation = false;
+      _avatarKey          = Object(); // refresh speech bubble
+    });
+
+    // Speak the AI-generated explanation
+    await _speak(explanation);
   }
 
   void _goToNextLetter() {
@@ -95,6 +176,7 @@ class _TeachingScreenState extends State<TeachingScreen>
       _selectedOption = null;
       _avatarKey      = Object();
     });
+    _speakIntro();
   }
 
   // ─────────────────────────────────────────
@@ -111,11 +193,8 @@ class _TeachingScreenState extends State<TeachingScreen>
             Expanded(
               child: Column(
                 children: [
-                  // ── Avatar + speech bubble  (~top 38%)
                   _buildAvatarSection(),
-                  // ── Phase content (fills remaining space)
                   Expanded(child: _buildPhaseContent()),
-                  // ── Progress dots
                   _buildProgressDots(),
                   const SizedBox(height: 12),
                 ],
@@ -136,7 +215,6 @@ class _TeachingScreenState extends State<TeachingScreen>
       padding: const EdgeInsets.fromLTRB(12, 10, 20, 10),
       child: Row(
         children: [
-          // Back button
           SizedBox(
             width: 48,
             height: 48,
@@ -145,7 +223,10 @@ class _TeachingScreenState extends State<TeachingScreen>
               borderRadius: BorderRadius.circular(14),
               child: InkWell(
                 borderRadius: BorderRadius.circular(14),
-                onTap: () => context.go(AppRoutes.modules),
+                onTap: () {
+                  _tts.stop();
+                  context.go(AppRoutes.modules);
+                },
                 child: const Icon(
                   Icons.arrow_back_ios_new_rounded,
                   color: _C.green,
@@ -155,18 +236,56 @@ class _TeachingScreenState extends State<TeachingScreen>
             ),
           ),
           const SizedBox(width: 12),
-          // Title + progress bar
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'English – Alphabets',
-                  style: GoogleFonts.nunito(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: _C.dark,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'English – Alphabets',
+                      style: GoogleFonts.nunito(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: _C.dark,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Tap to replay speech
+                    GestureDetector(
+                      onTap: () {
+                        switch (_phase) {
+                          case _Phase.intro:     _speakIntro();    break;
+                          case _Phase.mcq:       _speakMcq();      break;
+                          case _Phase.feedback:  _speakFeedback(); break;
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _C.blue.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.volume_up_rounded,
+                                size: 14, color: _C.blue),
+                            const SizedBox(width: 3),
+                            Text(
+                              'Replay',
+                              style: GoogleFonts.nunito(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: _C.blue,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 5),
                 Row(
@@ -177,7 +296,8 @@ class _TeachingScreenState extends State<TeachingScreen>
                         child: LinearProgressIndicator(
                           value: progress,
                           minHeight: 7,
-                          backgroundColor: _C.green.withValues(alpha: 0.15),
+                          backgroundColor:
+                              _C.green.withValues(alpha: 0.15),
                           valueColor:
                               const AlwaysStoppedAnimation<Color>(_C.green),
                         ),
@@ -208,11 +328,11 @@ class _TeachingScreenState extends State<TeachingScreen>
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       child: Column(
         children: [
-          // Avatar circle with AnimatedSwitcher
           AnimatedBuilder(
             animation: _bounceY,
             builder: (_, child) => Transform.translate(
-              offset: Offset(0, _phase == _Phase.intro ? _bounceY.value : 0),
+              offset:
+                  Offset(0, _phase == _Phase.intro ? _bounceY.value : 0),
               child: child,
             ),
             child: AnimatedSwitcher(
@@ -225,7 +345,6 @@ class _TeachingScreenState extends State<TeachingScreen>
             ),
           ),
           const SizedBox(height: 12),
-          // Speech bubble
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 280),
             child: _SpeechBubble(
@@ -292,16 +411,17 @@ class _TeachingScreenState extends State<TeachingScreen>
     );
   }
 
-  String _speechBubbleText() {
+String _speechBubbleText() {
     switch (_phase) {
       case _Phase.intro:
-        return 'This is the letter ${_lesson.letter}! Say it with me… ${_lesson.pronunciation}!';
+        return 'This is the letter ${_lesson.letter}! '
+            'Say it with me… ${_lesson.pronunciation}!';
       case _Phase.mcq:
         return _lesson.mcqQuestion;
       case _Phase.feedback:
-        return _isCorrect
-            ? 'Amazing! 🌟 You got it right!'
-            : _lesson.altExplanation;
+        if (_isCorrect) return 'Amazing! 🌟 You got it right!';
+        if (_loadingExplanation) return 'Hmm, let me explain... 🤔';
+        return _aiExplanation ?? _lesson.altExplanation;
     }
   }
 
@@ -313,7 +433,8 @@ class _TeachingScreenState extends State<TeachingScreen>
         position: Tween<Offset>(
           begin: const Offset(0.08, 0),
           end: Offset.zero,
-        ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
+        ).animate(
+            CurvedAnimation(parent: anim, curve: Curves.easeOut)),
         child: FadeTransition(opacity: anim, child: child),
       ),
       child: KeyedSubtree(
@@ -333,7 +454,6 @@ class _TeachingScreenState extends State<TeachingScreen>
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
       child: Column(
         children: [
-          // Emoji + word card
           Expanded(
             child: Container(
               width: double.infinity,
@@ -351,10 +471,8 @@ class _TeachingScreenState extends State<TeachingScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    _lesson.emoji,
-                    style: const TextStyle(fontSize: 64),
-                  ),
+                  Text(_lesson.emoji,
+                      style: const TextStyle(fontSize: 64)),
                   const SizedBox(height: 12),
                   Text(
                     _lesson.word,
@@ -378,7 +496,6 @@ class _TeachingScreenState extends State<TeachingScreen>
             ),
           ),
           const SizedBox(height: 16),
-          // CTA button
           _GreenButton(
             label: "I got it! Let's answer →",
             onTap: _goToMcq,
@@ -451,16 +568,18 @@ class _TeachingScreenState extends State<TeachingScreen>
               child: _OptionButton(
                 label: _lesson.options[i],
                 state: state,
-                onTap: null, // locked in feedback phase
+                onTap: null,
               ),
             );
           }),
           const Spacer(),
-          // Next / Finish button
           _isLastLetter
               ? _GreenButton(
                   label: "I'm done! 🎉",
-                  onTap: () => context.go(AppRoutes.modules),
+                  onTap: () {
+                    _tts.stop();
+                    context.go(AppRoutes.modules);
+                  },
                 )
               : _GreenButton(
                   label: 'Next Letter →',
@@ -479,7 +598,6 @@ class _TeachingScreenState extends State<TeachingScreen>
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(kLetterLessons.length, (i) {
             final isCurrent   = i == _letterIndex;
             final isCompleted = i < _letterIndex;
@@ -507,7 +625,7 @@ class _TeachingScreenState extends State<TeachingScreen>
 }
 
 // ─────────────────────────────────────────────
-//  SPEECH BUBBLE WIDGET
+//  SPEECH BUBBLE
 // ─────────────────────────────────────────────
 class _SpeechBubble extends StatelessWidget {
   final String text;
@@ -520,7 +638,8 @@ class _SpeechBubble extends StatelessWidget {
       children: [
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: _C.white,
             borderRadius: BorderRadius.circular(18),
@@ -543,7 +662,6 @@ class _SpeechBubble extends StatelessWidget {
             ),
           ),
         ),
-        // Triangle pointer below the bubble
         CustomPaint(
           size: const Size(20, 10),
           painter: _TrianglePainter(color: _C.white),
@@ -578,8 +696,8 @@ class _TrianglePainter extends CustomPainter {
 enum _OptionState { idle, correct, wrong }
 
 class _OptionButton extends StatelessWidget {
-  final String       label;
-  final _OptionState state;
+  final String        label;
+  final _OptionState  state;
   final VoidCallback? onTap;
 
   const _OptionButton({
@@ -611,8 +729,10 @@ class _OptionButton extends StatelessWidget {
     }
 
     final Widget trailing = switch (state) {
-      _OptionState.correct => const Text('✅', style: TextStyle(fontSize: 18)),
-      _OptionState.wrong   => const Text('❌', style: TextStyle(fontSize: 18)),
+      _OptionState.correct => const Text('✅',
+          style: TextStyle(fontSize: 18)),
+      _OptionState.wrong   => const Text('❌',
+          style: TextStyle(fontSize: 18)),
       _OptionState.idle    => const SizedBox.shrink(),
     };
 

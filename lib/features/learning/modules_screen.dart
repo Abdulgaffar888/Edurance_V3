@@ -5,9 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/router/app_router.dart';
 
-// ─────────────────────────────────────────────
-//  BRAND TOKENS
-// ─────────────────────────────────────────────
 class _C {
   static const yellow = Color(0xFFFFD94A);
   static const blue   = Color(0xFF4AC8FF);
@@ -19,14 +16,11 @@ class _C {
   static const muted  = Color(0xFF9E9EA8);
 }
 
-// ─────────────────────────────────────────────
-//  SUBJECT MODEL
-// ─────────────────────────────────────────────
 class _Subject {
   final String name;
   final String emoji;
   final String currentTopic;
-  final double progress;     // 0.0 – 1.0
+  final double progress;
   final Color accent;
   final Color accentLight;
   final Color accentDark;
@@ -44,65 +38,19 @@ class _Subject {
   });
 }
 
-// ─────────────────────────────────────────────
-//  HARDCODED DUMMY DATA
-// ─────────────────────────────────────────────
 const _subjects = <_Subject>[
-  _Subject(
-    name: 'Math',
-    emoji: '➕',
-    currentTopic: 'Addition & Subtraction',
-    progress: 0.72,
-    accent: _C.yellow,
-    accentLight: Color(0xFFFFF8D6),
-    accentDark: Color(0xFFE6B800),
-    gradient: [Color(0xFFFFE566), Color(0xFFFFD94A)],
-  ),
   _Subject(
     name: 'English',
     emoji: '📖',
-    currentTopic: 'Nouns & Pronouns',
-    progress: 0.45,
+    currentTopic: 'Alphabets A-Z',
+    progress: 0.0,
     accent: _C.blue,
     accentLight: Color(0xFFDFF6FF),
     accentDark: Color(0xFF1AAEE6),
     gradient: [Color(0xFF73D6FF), Color(0xFF4AC8FF)],
   ),
-  _Subject(
-    name: 'Science',
-    emoji: '🔬',
-    currentTopic: 'Plants & Their Parts',
-    progress: 0.60,
-    accent: _C.green,
-    accentLight: Color(0xFFDCFAEB),
-    accentDark: Color(0xFF38B564),
-    gradient: [Color(0xFF7DDFAA), Color(0xFF56CF7E)],
-  ),
-  _Subject(
-    name: 'Hindi',
-    emoji: 'अ',
-    currentTopic: 'स्वर और व्यंजन',
-    progress: 0.30,
-    accent: _C.coral,
-    accentLight: Color(0xFFFFEBEB),
-    accentDark: Color(0xFFE64444),
-    gradient: [Color(0xFFFF9090), Color(0xFFFF6B6B)],
-  ),
-  _Subject(
-    name: 'EVS',
-    emoji: '🌿',
-    currentTopic: 'Our Environment',
-    progress: 0.85,
-    accent: _C.purple,
-    accentLight: Color(0xFFF0E8FF),
-    accentDark: Color(0xFF8A56E6),
-    gradient: [Color(0xFFC49EFF), Color(0xFFAB7BFF)],
-  ),
 ];
 
-// ─────────────────────────────────────────────
-//  MODULES SCREEN
-// ─────────────────────────────────────────────
 class ModulesScreen extends StatefulWidget {
   const ModulesScreen({super.key});
 
@@ -112,10 +60,8 @@ class ModulesScreen extends StatefulWidget {
 
 class _ModulesScreenState extends State<ModulesScreen>
     with TickerProviderStateMixin {
-  // Child name (hardcoded; will come from auth/state later)
   static const _childName = 'Aarav';
 
-  // Animations
   late final AnimationController _headerEntrance;
   late final Animation<double> _headerFade;
   late final Animation<double> _headerSlide;
@@ -124,9 +70,6 @@ class _ModulesScreenState extends State<ModulesScreen>
 
   late final AnimationController _mascotBounce;
   late final Animation<double> _mascotY;
-
-  late final AnimationController _streakPulse;
-  late final Animation<double> _streakScale;
 
   @override
   void initState() {
@@ -158,14 +101,6 @@ class _ModulesScreenState extends State<ModulesScreen>
     _mascotY = Tween<double>(begin: 0, end: -7).animate(
       CurvedAnimation(parent: _mascotBounce, curve: Curves.easeInOut),
     );
-
-    _streakPulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
-    _streakScale = Tween<double>(begin: 1.0, end: 1.08).animate(
-      CurvedAnimation(parent: _streakPulse, curve: Curves.easeInOut),
-    );
   }
 
   @override
@@ -173,18 +108,13 @@ class _ModulesScreenState extends State<ModulesScreen>
     _headerEntrance.dispose();
     _gridEntrance.dispose();
     _mascotBounce.dispose();
-    _streakPulse.dispose();
     super.dispose();
   }
 
   void _onSubjectTap(_Subject subject) {
-    // TODO: pass subject name via GoRouter extras once extras API is wired
     context.go(AppRoutes.teaching);
   }
 
-  // ─────────────────────────────────────────
-  //  BUILD
-  // ─────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -202,9 +132,8 @@ class _ModulesScreenState extends State<ModulesScreen>
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(child: _buildHeader()),
-              SliverToBoxAdapter(child: _buildStreakBanner()),
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                 sliver: SliverToBoxAdapter(
                   child: Text(
                     'Your Subjects',
@@ -227,7 +156,6 @@ class _ModulesScreenState extends State<ModulesScreen>
     );
   }
 
-  // ─────── HEADER ────────
   Widget _buildHeader() {
     return AnimatedBuilder(
       animation: _headerEntrance,
@@ -267,7 +195,7 @@ class _ModulesScreenState extends State<ModulesScreen>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'What are we learning today?',
+                    'Ready to learn your ABCs? 🔤',
                     style: GoogleFonts.nunito(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -278,7 +206,6 @@ class _ModulesScreenState extends State<ModulesScreen>
               ),
             ),
             const SizedBox(width: 12),
-            // Floating mascot avatar
             AnimatedBuilder(
               animation: _mascotY,
               builder: (_, child) => Transform.translate(
@@ -322,7 +249,8 @@ class _ModulesScreenState extends State<ModulesScreen>
                   ],
                 ),
                 child: const Center(
-                  child: Text('👨\u200d👩\u200d👧', style: TextStyle(fontSize: 22)),
+                  child: Text('👨\u200d👩\u200d👧',
+                      style: TextStyle(fontSize: 22)),
                 ),
               ),
             ),
@@ -332,87 +260,11 @@ class _ModulesScreenState extends State<ModulesScreen>
     );
   }
 
-  // ─────── STREAK BANNER ────────
-  Widget _buildStreakBanner() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      child: AnimatedBuilder(
-        animation: _streakScale,
-        builder: (_, child) => Transform.scale(
-          scale: _streakScale.value,
-          child: child,
-        ),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFFF9A3C), Color(0xFFFF6B6B)],
-            ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: _C.coral.withValues(alpha: 0.35),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              const Text('🔥', style: TextStyle(fontSize: 28)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '5-Day Streak!',
-                      style: GoogleFonts.nunito(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                      ),
-                    ),
-                    Text(
-                      'Keep it up — you\'re on fire!',
-                      style: GoogleFonts.nunito(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white.withValues(alpha: 0.85),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '⭐ 320 pts',
-                  style: GoogleFonts.nunito(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ─────── SUBJECT GRID ────────
   SliverGrid _buildGrid() {
     return SliverGrid(
       delegate: SliverChildBuilderDelegate(
         (context, index) {
           final subject = _subjects[index];
-          // staggered delay per card
           final delay = index * 0.15;
           final end   = (delay + 0.5).clamp(0.0, 1.0);
           final curved = CurvedAnimation(
@@ -446,9 +298,6 @@ class _ModulesScreenState extends State<ModulesScreen>
   }
 }
 
-// ─────────────────────────────────────────────
-//  SUBJECT CARD WIDGET
-// ─────────────────────────────────────────────
 class _SubjectCard extends StatefulWidget {
   final _Subject subject;
   final VoidCallback onTap;
@@ -512,12 +361,14 @@ class _SubjectCardState extends State<_SubjectCard>
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: s.accent.withValues(alpha: 0.35 * _pressElevation.value),
+                  color: s.accent.withValues(
+                      alpha: 0.35 * _pressElevation.value),
                   blurRadius: 20 * _pressElevation.value,
                   offset: Offset(0, 8 * _pressElevation.value),
                 ),
                 BoxShadow(
-                  color: s.accent.withValues(alpha: 0.15 * _pressElevation.value),
+                  color: s.accent.withValues(
+                      alpha: 0.15 * _pressElevation.value),
                   blurRadius: 8 * _pressElevation.value,
                   offset: Offset(0, 2 * _pressElevation.value),
                 ),
@@ -537,13 +388,10 @@ class _SubjectCardState extends State<_SubjectCard>
               ),
               child: Stack(
                 children: [
-                  // Background decoration circles
                   Positioned(
-                    top: -20,
-                    right: -20,
+                    top: -20, right: -20,
                     child: Container(
-                      width: 90,
-                      height: 90,
+                      width: 90, height: 90,
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
@@ -551,56 +399,37 @@ class _SubjectCardState extends State<_SubjectCard>
                     ),
                   ),
                   Positioned(
-                    bottom: 30,
-                    left: -15,
+                    bottom: 30, left: -15,
                     child: Container(
-                      width: 55,
-                      height: 55,
+                      width: 55, height: 55,
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.10),
                         shape: BoxShape.circle,
                       ),
                     ),
                   ),
-                  // Card content
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Top row: emoji + progress ring
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Emoji badge
                             Container(
-                              width: 52,
-                              height: 52,
+                              width: 52, height: 52,
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.35),
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: Center(
-                                child: s.name == 'Hindi'
-                                    ? Text(
-                                        s.emoji,
-                                        style: GoogleFonts.nunito(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.w900,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : Text(
-                                        s.emoji,
-                                        style: const TextStyle(fontSize: 26),
-                                      ),
+                                child: Text(s.emoji,
+                                    style: const TextStyle(fontSize: 26)),
                               ),
                             ),
-                            // Circular progress
                             SizedBox(
-                              width: 46,
-                              height: 46,
+                              width: 46, height: 46,
                               child: TweenAnimationBuilder<double>(
                                 tween: Tween(begin: 0, end: s.progress),
                                 duration: const Duration(milliseconds: 1100),
@@ -609,7 +438,8 @@ class _SubjectCardState extends State<_SubjectCard>
                                   return CustomPaint(
                                     painter: _RingPainter(
                                       progress: value,
-                                      trackColor: Colors.white.withValues(alpha: 0.3),
+                                      trackColor:
+                                          Colors.white.withValues(alpha: 0.3),
                                       fillColor: Colors.white,
                                       strokeWidth: 4.5,
                                     ),
@@ -631,7 +461,6 @@ class _SubjectCardState extends State<_SubjectCard>
                           ],
                         ),
                         const Spacer(),
-                        // Subject name
                         Text(
                           s.name,
                           style: GoogleFonts.nunito(
@@ -641,12 +470,9 @@ class _SubjectCardState extends State<_SubjectCard>
                           ),
                         ),
                         const SizedBox(height: 4),
-                        // Current topic chip
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
+                              horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.25),
                             borderRadius: BorderRadius.circular(10),
@@ -664,7 +490,6 @@ class _SubjectCardState extends State<_SubjectCard>
                           ),
                         ),
                         const SizedBox(height: 10),
-                        // Progress bar
                         ClipRRect(
                           borderRadius: BorderRadius.circular(6),
                           child: TweenAnimationBuilder<double>(
@@ -703,9 +528,6 @@ class _SubjectCardState extends State<_SubjectCard>
   }
 }
 
-// ─────────────────────────────────────────────
-//  RING PAINTER (reused from report screen)
-// ─────────────────────────────────────────────
 class _RingPainter extends CustomPainter {
   final double progress;
   final Color trackColor;
@@ -725,8 +547,7 @@ class _RingPainter extends CustomPainter {
     final radius = (size.shortestSide - strokeWidth) / 2;
 
     canvas.drawCircle(
-      center,
-      radius,
+      center, radius,
       Paint()
         ..color = trackColor
         ..style = PaintingStyle.stroke
@@ -736,7 +557,7 @@ class _RingPainter extends CustomPainter {
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      -math.pi / 2,           // 12 o'clock
+      -math.pi / 2,
       2 * math.pi * progress,
       false,
       Paint()
