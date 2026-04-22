@@ -320,7 +320,7 @@ class _DiagnosticTestScreenState extends State<DiagnosticTestScreen>
 
   void _onComplete() {
     // TODO: pass _answers map via GoRouter extras once extras API is wired
-    context.go(AppRoutes.diagnosticReport);
+    context.go(AppRoutes.modules);
   }
 
   // ─────────────────────────────────────────

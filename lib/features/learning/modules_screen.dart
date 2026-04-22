@@ -1,9 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/router/app_router.dart';
+import '../../providers/signup_notifier.dart';
 
 class _C {
   static const yellow = Color(0xFFFFD94A);
@@ -42,25 +44,64 @@ const _subjects = <_Subject>[
   _Subject(
     name: 'English',
     emoji: '📖',
-    currentTopic: 'Alphabets A-Z',
-    progress: 0.0,
+    currentTopic: 'Alphabets A–Z',
+    progress: 0.15,
     accent: _C.blue,
     accentLight: Color(0xFFDFF6FF),
     accentDark: Color(0xFF1AAEE6),
     gradient: [Color(0xFF73D6FF), Color(0xFF4AC8FF)],
   ),
+  _Subject(
+    name: 'Maths',
+    emoji: '🔢',
+    currentTopic: 'Numbers 1–20',
+    progress: 0.0,
+    accent: _C.coral,
+    accentLight: Color(0xFFFFE5E5),
+    accentDark: Color(0xFFE64444),
+    gradient: [Color(0xFFFF9A8B), Color(0xFFFF6B6B)],
+  ),
+  _Subject(
+    name: 'Science',
+    emoji: '🔬',
+    currentTopic: 'Plants & Animals',
+    progress: 0.0,
+    accent: _C.green,
+    accentLight: Color(0xFFDFFFF0),
+    accentDark: Color(0xFF3AB85A),
+    gradient: [Color(0xFF7DDFAA), Color(0xFF56CF7E)],
+  ),
+  _Subject(
+    name: 'Hindi',
+    emoji: '📝',
+    currentTopic: 'Swar – अ आ इ',
+    progress: 0.0,
+    accent: _C.purple,
+    accentLight: Color(0xFFF0E6FF),
+    accentDark: Color(0xFF8A55E6),
+    gradient: [Color(0xFFC5A3FF), Color(0xFFAB7BFF)],
+  ),
+  _Subject(
+    name: 'EVS',
+    emoji: '🌍',
+    currentTopic: 'My Family & Home',
+    progress: 0.0,
+    accent: _C.yellow,
+    accentLight: Color(0xFFFFF8D6),
+    accentDark: Color(0xFFE6B800),
+    gradient: [Color(0xFFFFE07A), Color(0xFFFFD94A)],
+  ),
 ];
 
-class ModulesScreen extends StatefulWidget {
+class ModulesScreen extends ConsumerStatefulWidget {
   const ModulesScreen({super.key});
 
   @override
-  State<ModulesScreen> createState() => _ModulesScreenState();
+  ConsumerState<ModulesScreen> createState() => _ModulesScreenState();
 }
 
-class _ModulesScreenState extends State<ModulesScreen>
+class _ModulesScreenState extends ConsumerState<ModulesScreen>
     with TickerProviderStateMixin {
-  static const _childName = 'Aarav';
 
   late final AnimationController _headerEntrance;
   late final Animation<double> _headerFade;
@@ -157,6 +198,9 @@ class _ModulesScreenState extends State<ModulesScreen>
   }
 
   Widget _buildHeader() {
+    final childName = ref.watch(signupProvider).childName.isEmpty
+        ? 'Learner'
+        : ref.watch(signupProvider).childName;
     return AnimatedBuilder(
       animation: _headerEntrance,
       builder: (_, child) => Opacity(
@@ -179,7 +223,7 @@ class _ModulesScreenState extends State<ModulesScreen>
                     text: TextSpan(
                       children: [
                         TextSpan(
-                          text: 'Hello $_childName! ',
+                          text: 'Hello $childName! ',
                           style: GoogleFonts.nunito(
                             fontSize: 28,
                             fontWeight: FontWeight.w900,
@@ -195,7 +239,7 @@ class _ModulesScreenState extends State<ModulesScreen>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Ready to learn your ABCs? 🔤',
+                    'What do you want to learn today? 🚀',
                     style: GoogleFonts.nunito(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -292,7 +336,7 @@ class _ModulesScreenState extends State<ModulesScreen>
         crossAxisCount: 2,
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio: 0.88,
+        childAspectRatio: 0.92,
       ),
     );
   }

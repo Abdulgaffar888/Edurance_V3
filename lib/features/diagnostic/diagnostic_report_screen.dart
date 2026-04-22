@@ -235,7 +235,7 @@ class _DiagnosticReportScreenState extends State<DiagnosticReportScreen>
                 Align(
                   alignment: Alignment.centerLeft,
                   child: GestureDetector(
-                    onTap: () => context.go(AppRoutes.diagnostic),
+                    onTap: () => context.go(AppRoutes.modules),
                     child: Container(
                       width: 40,
                       height: 40,

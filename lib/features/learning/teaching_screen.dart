@@ -78,9 +78,11 @@ class _TeachingScreenState extends State<TeachingScreen>
 
   Future<void> _initTts() async {
     await _tts.setLanguage('en-IN');
-    await _tts.setSpeechRate(0.45);   // slow and clear for children
+    await _tts.setVoice({"name": "en-in-x-ene-local", "locale": "en-IN"});
+    await _tts.setSpeechRate(0.38);   // slower and clearer for young children
     await _tts.setVolume(1.0);
-    await _tts.setPitch(1.2);         // slightly higher pitch, friendlier
+    await _tts.setPitch(1.35);        // warmer, more expressive pitch
+    await _tts.awaitSpeakCompletion(true); // prevent letter overlap on quick taps
     setState(() => _ttsReady = true);
     // Speak the first letter on load
     await _speakIntro();
@@ -93,11 +95,9 @@ class _TeachingScreenState extends State<TeachingScreen>
 
   Future<void> _speakIntro() async {
     final l = _lesson;
-    await _speak(
-      'This is the letter ${l.letter}. '
-      'Say it with me... ${l.pronunciation}! '
-      '${l.letter} is for ${l.word}.',
-    );
+    await _speak('The letter ${l.letter}.');
+    await Future.delayed(const Duration(milliseconds: 600));
+    await _speak('${l.letter} is for ${l.word}. ${l.word}!');
   }
 
   Future<void> _speakMcq() async {

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/router/app_router.dart';
+import '../../providers/signup_notifier.dart';
 
 // ─────────────────────────────────────────────
 //  BRAND TOKENS
@@ -48,14 +51,14 @@ class _C {
 // ─────────────────────────────────────────────
 //  SIGNUP SCREEN
 // ─────────────────────────────────────────────
-class SignupScreen extends StatefulWidget {
+class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
 
   @override
-  State<SignupScreen> createState() => _SignupScreenState();
+  ConsumerState<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _SignupScreenState extends State<SignupScreen>
+class _SignupScreenState extends ConsumerState<SignupScreen>
     with TickerProviderStateMixin {
   // ── PageController
   final _pageController = PageController();
@@ -116,7 +119,15 @@ class _SignupScreenState extends State<SignupScreen>
     );
 
     _nameController.addListener(_rebuild);
+    _nameController.addListener(() {
+      ref.read(signupProvider.notifier)
+          .updateChildName(_nameController.text.trim());
+    });
     _mobileController.addListener(_rebuild);
+    _mobileController.addListener(() {
+      ref.read(signupProvider.notifier)
+          .updateParentMobile(_mobileController.text.trim());
+    });
   }
 
   void _rebuild() => setState(() {});
@@ -196,10 +207,39 @@ class _SignupScreenState extends State<SignupScreen>
     }).catchError((_) {/* cancelled – ignore */});
   }
 
-  void _onSubmit() {
-    // TODO: wire to Supabase signup before navigating
-    context.go(AppRoutes.modules);
+Future<void> _onSubmit() async {
+  final signupState = ref.read(signupProvider);
+
+  final email = '${signupState.parentMobile}@edurance.app';
+  final password = signupState.parentMobile;
+
+  final supabase = Supabase.instance.client;
+
+  AuthResponse response;
+
+  try {
+    response = await supabase.auth.signInWithPassword(
+      email: email,
+      password: password,
+    );
+  } catch (_) {
+    response = await supabase.auth.signUp(
+      email: email,
+      password: password,
+      data: {
+        'childName': signupState.childName,
+        'gender': signupState.gender,
+        'age': signupState.age,
+        'classLevel': signupState.classLevel,
+        'parentMobile': signupState.parentMobile,
+      },
+    );
   }
+
+  if (!mounted) return;
+
+  context.go(AppRoutes.modules);
+}
 
   // ─────────────────────────────────────────
   //  BUILD
@@ -532,7 +572,10 @@ class _SignupScreenState extends State<SignupScreen>
             emoji: emoji,
             color: color,
             isSelected: isSelected,
-            onTap: () => setState(() => _gender = label),
+            onTap: () {
+                setState(() => _gender = label);
+                ref.read(signupProvider.notifier).updateGender(label);
+              },
           );
         }).toList(),
       ),
@@ -568,7 +611,10 @@ class _SignupScreenState extends State<SignupScreen>
                 _StepperButton(
                   icon: Icons.remove_rounded,
                   onTap: _age > 5
-                      ? () => setState(() => _age--)
+                      ? () {
+                          setState(() => _age--);
+                          ref.read(signupProvider.notifier).updateAge(_age);
+                        }
                       : null,
                   color: _C.green,
                 ),
@@ -596,7 +642,10 @@ class _SignupScreenState extends State<SignupScreen>
                 _StepperButton(
                   icon: Icons.add_rounded,
                   onTap: _age < 10
-                      ? () => setState(() => _age++)
+                      ? () {
+                          setState(() => _age++);
+                          ref.read(signupProvider.notifier).updateAge(_age);
+                        }
                       : null,
                   color: _C.green,
                 ),
@@ -627,7 +676,10 @@ class _SignupScreenState extends State<SignupScreen>
                 label: 'Class $gradeNum',
                 isSelected: isSelected,
                 color: _C.green,
-                onTap: () => setState(() => _grade = gradeNum),
+                onTap: () {
+                    setState(() => _grade = gradeNum);
+                    ref.read(signupProvider.notifier).updateClassLevel(gradeNum);
+                  },
               );
             }),
           ),

@@ -1,31 +1,29 @@
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../features/auth/signup_screen.dart';
 import '../../features/auth/login_screen.dart';
-
 import '../../features/learning/modules_screen.dart';
 import '../../features/learning/teaching_screen.dart';
 import '../../features/parent/parent_control_screen.dart';
 
-// ─────────────────────────────────────────────
-//  ROUTE NAMES  (use these constants everywhere
-//  instead of raw strings to avoid typos)
-// ─────────────────────────────────────────────
 abstract final class AppRoutes {
-  static const signup         = '/signup';
-  static const login          = '/login';
+  static const signup = '/signup';
+  static const login = '/login';
 
-  static const modules        = '/modules';
-  static const teaching       = '/teaching';
-  static const parentControl  = '/parent-control';
+  static const modules = '/modules';
+  static const teaching = '/teaching';
+  static const parentControl = '/parent-control';
 }
 
-// ─────────────────────────────────────────────
-//  ROUTER
-// ─────────────────────────────────────────────
 final appRouter = GoRouter(
-  initialLocation: AppRoutes.signup,
-  debugLogDiagnostics: true,       // prints route changes in debug console
+  initialLocation:
+      Supabase.instance.client.auth.currentSession != null
+          ? AppRoutes.modules
+          : AppRoutes.signup,
+
+  debugLogDiagnostics: true,
+
   routes: [
     GoRoute(
       path: AppRoutes.signup,
@@ -37,7 +35,6 @@ final appRouter = GoRouter(
       name: 'login',
       builder: (context, state) => const LoginScreen(),
     ),
-
     GoRoute(
       path: AppRoutes.modules,
       name: 'modules',
