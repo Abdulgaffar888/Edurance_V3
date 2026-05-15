@@ -12,7 +12,12 @@ class AnalyticsService {
   }) async {
     try {
       final userId = _db.auth.currentUser?.id;
-      if (userId == null) return null;
+      debugPrint('Analytics startSession → userId: $userId, lessonId: $lessonId, subject: $subject');
+
+      if (userId == null) {
+        debugPrint('Analytics startSession → ABORTED: no authenticated user');
+        return null;
+      }
 
       final response = await _db
           .from('learning_sessions')
@@ -24,9 +29,13 @@ class AnalyticsService {
           .select('id')
           .single();
 
-      return response['id'] as String?;
-    } catch (e) {
-      debugPrint('Analytics startSession error: $e');
+      debugPrint('Analytics startSession → insert response: $response');
+      final sessionId = response['id'] as String?;
+      debugPrint('Analytics startSession → sessionId: $sessionId');
+      return sessionId;
+    } catch (e, stack) {
+      debugPrint('Analytics startSession ERROR: $e');
+      debugPrintStack(stackTrace: stack);
       return null;
     }
   }
@@ -38,6 +47,8 @@ class AnalyticsService {
     required int    timeSpentSeconds,
   }) async {
     try {
+      debugPrint('Analytics completeSession → sessionId: $sessionId, score: $score, timeSpentSeconds: $timeSpentSeconds');
+
       await _db
           .from('learning_sessions')
           .update({
@@ -47,14 +58,19 @@ class AnalyticsService {
             'completed_at':       DateTime.now().toIso8601String(),
           })
           .eq('id', sessionId);
-    } catch (e) {
-      debugPrint('Analytics completeSession error: $e');
+
+      debugPrint('Analytics completeSession → update succeeded for sessionId: $sessionId');
+    } catch (e, stack) {
+      debugPrint('Analytics completeSession ERROR: $e');
+      debugPrintStack(stackTrace: stack);
     }
   }
 
   /// Increments the replays_used counter for the given session by 1.
   static Future<void> incrementReplayCount(String sessionId) async {
     try {
+      debugPrint('Analytics incrementReplayCount → sessionId: $sessionId');
+
       final row = await _db
           .from('learning_sessions')
           .select('replays_used')
@@ -62,13 +78,17 @@ class AnalyticsService {
           .single();
 
       final current = (row['replays_used'] as num?)?.toInt() ?? 0;
+      debugPrint('Analytics incrementReplayCount → current replays_used: $current');
 
       await _db
           .from('learning_sessions')
           .update({'replays_used': current + 1})
           .eq('id', sessionId);
-    } catch (e) {
-      debugPrint('Analytics incrementReplayCount error: $e');
+
+      debugPrint('Analytics incrementReplayCount → updated to: ${current + 1}');
+    } catch (e, stack) {
+      debugPrint('Analytics incrementReplayCount ERROR: $e');
+      debugPrintStack(stackTrace: stack);
     }
   }
 }

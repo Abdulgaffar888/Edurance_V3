@@ -50,6 +50,9 @@ class _TeachingScreenState extends State<TeachingScreen>
   String? _sessionId;
   late DateTime _sessionStartedAt;
 
+  // ── Initialization guard
+  bool _initialized = false;
+
 
 
 
@@ -63,6 +66,9 @@ class _TeachingScreenState extends State<TeachingScreen>
 @override
 void didChangeDependencies() {
   super.didChangeDependencies();
+
+  // Prevent re-initialization on subsequent didChangeDependencies calls
+  if (_initialized) return;
 
   moduleType =
       (GoRouterState.of(context).extra as String?) ?? 'alphabet';
@@ -92,6 +98,11 @@ void didChangeDependencies() {
 
   // ✅ RESET intro speech when module changes
   _moduleIntroSpoken = false;
+
+  _initialized = true;
+
+  // Start audio + analytics AFTER moduleType and activeLessons are ready
+  _resumeAndStartAudio();
 }
 
   Lesson get _lesson => activeLessons[_letterIndex];
@@ -149,9 +160,6 @@ void initState() {
   );
 
   _bounceCtrl.repeat(reverse: true);
-
-  // Resume correct lesson BEFORE audio starts
-  _resumeAndStartAudio();
 }
 
 /// Restores the next incomplete alphabet lesson index from Supabase metadata
@@ -169,8 +177,21 @@ Future<void> _resumeAndStartAudio() async {
       metadata["${moduleType}_completedLessons"];
 
   if (completed == null) {
-    // first-time learner → start from A
-    await _startLessonAudio();
+    // first-time learner → start from first lesson
+    debugPrint('Starting analytics session');
+    _sessionStartedAt = DateTime.now();
+    _sessionId = await AnalyticsService.startSession(
+      lessonId: activeLessons[_letterIndex].id,
+      subject:  moduleType,
+    );
+    debugPrint('Analytics session created: $_sessionId');
+
+    debugPrint('Starting lesson audio');
+    try {
+      await _startLessonAudio();
+    } catch (e) {
+      debugPrint('Lesson audio failed: $e');
+    }
     return;
   }
 
@@ -197,14 +218,20 @@ Future<void> _resumeAndStartAudio() async {
     setState(() => _letterIndex = nextIndex);
   }
 
-  await _startLessonAudio();
-
-  // ── Start analytics session after lesson index is resolved
+  debugPrint('Starting analytics session');
   _sessionStartedAt = DateTime.now();
   _sessionId = await AnalyticsService.startSession(
     lessonId: activeLessons[_letterIndex].id,
     subject:  moduleType,
   );
+  debugPrint('Analytics session created: $_sessionId');
+
+  debugPrint('Starting lesson audio');
+  try {
+    await _startLessonAudio();
+  } catch (e) {
+    debugPrint('Lesson audio failed: $e');
+  }
 }
 
 
