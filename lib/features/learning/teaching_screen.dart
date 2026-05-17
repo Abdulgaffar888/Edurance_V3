@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:confetti/confetti.dart';
+import 'dart:math';
 import '../../core/router/app_router.dart';
 import '../../services/ai/openai_service.dart';
 import '../../data/lesson_data.dart';
@@ -12,6 +14,7 @@ import '../../services/analytics/analytics_service.dart';
 //  BRAND TOKENS
 // ─────────────────────────────────────────────
 class _C {
+  static const purple = Color(0xFF9B6BFF);
   static const yellow = Color(0xFFFFD94A);
   static const blue   = Color(0xFF4AC8FF);
   static const coral  = Color(0xFFFF6B6B);
@@ -46,6 +49,11 @@ class _TeachingScreenState extends State<TeachingScreen>
 
   bool _moduleIntroSpoken = false;
 
+  // Guards rhyme auto-play: true while narration + delay is in progress.
+  bool _autoPlaying = false;
+  // Prevents duplicate completion dialogs from auto-advance + manual tap race.
+  bool _completionShown = false;
+
   // ── Analytics
   String? _sessionId;
   late DateTime _sessionStartedAt;
@@ -70,30 +78,34 @@ void didChangeDependencies() {
   // Prevent re-initialization on subsequent didChangeDependencies calls
   if (_initialized) return;
 
-  moduleType =
-      (GoRouterState.of(context).extra as String?) ?? 'alphabet';
+  final extra = GoRouterState.of(context).extra;
 
-  switch (moduleType) {
-    case 'numbers':
-      activeLessons = numberLessons;
-      break;
+  if (extra is Map) {
+    final map = Map<String, String>.from(extra as Map);
+    moduleType = map['module'] ?? 'rhymes';
+    final rhymeId = map['rhymeId'] ?? '';
 
-    case 'colors':
-      activeLessons = colorLessons;
-      break;
+    activeLessons = rhymeLessons
+        .where((l) => l.id.startsWith('${rhymeId}_line_'))
+        .toList();
+  } else {
+    moduleType = (extra as String?) ?? 'alphabet';
 
-    case 'shapes':
-      activeLessons = shapeLessons;
-      break;
-
-    case 'rhymes':
-      activeLessons = rhymeLessons;
-      break;
-
-    case 'alphabet':
-    default:
-      activeLessons = alphabetLessons;
-      break;
+    switch (moduleType) {
+      case 'numbers':
+        activeLessons = numberLessons;
+        break;
+      case 'colors':
+        activeLessons = colorLessons;
+        break;
+      case 'shapes':
+        activeLessons = shapeLessons;
+        break;
+      case 'alphabet':
+      default:
+        activeLessons = alphabetLessons;
+        break;
+    }
   }
 
   // ✅ RESET intro speech when module changes
@@ -138,6 +150,7 @@ void didChangeDependencies() {
 
 late final AnimationController _bounceCtrl;
 late final Animation<double> _bounceY;
+late final ConfettiController _confettiController;
 
 @override
 void initState() {
@@ -160,6 +173,8 @@ void initState() {
   );
 
   _bounceCtrl.repeat(reverse: true);
+
+  _confettiController = ConfettiController(duration: const Duration(seconds: 2));
 }
 
 /// Restores the next incomplete alphabet lesson index from Supabase metadata
@@ -260,11 +275,127 @@ Future<void> _resumeAndStartAudio() async {
 
 
   /// Speaks the intro for the current lesson (called after index is set).
+  /// For rhymes, also schedules automatic progression to the next line.
   Future<void> _startLessonAudio() async {
+    if (moduleType == 'rhymes') {
+      await _speakIntroAndAutoAdvance();
+    } else {
+      await _speakIntro();
+    }
+  }
+
+  /// Rhyme-only: narrates the current line, waits 1.2 s,
+  /// then auto-advances — unless the user already tapped manually.
+  Future<void> _speakIntroAndAutoAdvance() async {
+    _autoPlaying = true;
     await _speakIntro();
+
+    // Short pause so the child can absorb the line before moving on.
+    await Future.delayed(const Duration(milliseconds: 1200));
+
+    if (!mounted || !_autoPlaying) return; // manual tap already handled it
+    _autoPlaying = false;
+    _goToMcq(); // handles rhyme save + next-line / completion
   }
 
   void _showCompletionDialog() {
+    if (_completionShown) return; // prevent double-dialog race
+    _completionShown = true;
+
+    if (_lesson.module == 'rhymes') {
+      _confettiController.play();
+      final praises = [
+        'Amazing Singing!',
+        'You’re a Superstar!',
+        'Fantastic Job!',
+        'Wonderful Reading!'
+      ];
+      final praise = praises[Random().nextInt(praises.length)];
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          backgroundColor: _C.white,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '🎵',
+                style: const TextStyle(fontSize: 56),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                praise,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 26,
+                  color: _C.dark,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _C.yellow.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('⭐', style: const TextStyle(fontSize: 20)),
+                    const SizedBox(width: 8),
+                    Text(
+                      '+10 Stars!',
+                      style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                        color: const Color(0xFFF2994A), // Deep orange-yellow
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "You finished ${_lesson.title}!",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: _C.muted,
+                ),
+              ),
+              const SizedBox(height: 32),
+              _GreenButton(
+                label: 'Back to Modules',
+                onTap: () {
+                  if (_sessionId != null) {
+                    AnalyticsService.completeSession(
+                      sessionId:        _sessionId!,
+                      score:            _isCorrect ? 1 : 0,
+                      timeSpentSeconds: DateTime.now()
+                          .difference(_sessionStartedAt)
+                          .inSeconds,
+                    );
+                  }
+                  Navigator.of(context).pop();
+                  context.go(AppRoutes.modules);
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -383,7 +514,7 @@ Future<void> _speakIntro() async {
     case 'rhymes':
 
       if (!_moduleIntroSpoken) {
-        await _speak('Let’s learn a rhyme.');
+        await _speak("Let's learn ${l.title}!");
         await Future.delayed(const Duration(milliseconds: 300));
         _moduleIntroSpoken = true;
       }
@@ -408,11 +539,23 @@ Future<void> _speakIntro() async {
 @override
 void dispose() {
   _bounceCtrl.dispose();
+  _confettiController.dispose();
   super.dispose();
 }
 
   // ── Phase transitions
   void _goToMcq() {
+    // Rhymes have no MCQ — advance directly to the next line.
+    if (_lesson.module == 'rhymes') {
+      _autoPlaying = false; // cancel any pending auto-advance
+      _saveCompletedLesson(_lesson.id);
+      if (_isLastLetter) {
+        _showCompletionDialog();
+      } else {
+        _goToNextLetter();
+      }
+      return;
+    }
     setState(() {
       _phase     = _Phase.mcq;
       _avatarKey = Object();
@@ -486,13 +629,14 @@ void _selectOption(int index) {
   }
 
   void _goToNextLetter() {
+    _autoPlaying = false; // cancel pending auto-advance before state change
     setState(() {
       if (!_isLastLetter) _letterIndex++;
       _phase          = _Phase.intro;
       _selectedOption = null;
       _avatarKey      = Object();
     });
-    _speakIntro();
+    _startLessonAudio(); // rhymes: auto-advances again; others: speakIntro
   }
 
   // ─────────────────────────────────────────
@@ -503,16 +647,40 @@ void _selectOption(int index) {
     return Scaffold(
       backgroundColor: _C.bg,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            _buildTopBar(),
-            Expanded(
-              child: Column(
-                children: [
-                  _buildAvatarSection(),
-                  Expanded(child: _buildPhaseContent()),
-                  _buildProgressDots(),
-                  const SizedBox(height: 12),
+            Column(
+              children: [
+                _buildTopBar(),
+                Expanded(
+                  child: Column(
+                    children: [
+                      _buildAvatarSection(),
+                      Expanded(child: _buildPhaseContent()),
+                      _buildProgressDots(),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirection: pi / 2, // fall downwards
+                maxBlastForce: 5,
+                minBlastForce: 2,
+                emissionFrequency: 0.05,
+                numberOfParticles: 20,
+                gravity: 0.2,
+                colors: const [
+                  _C.coral,
+                  _C.green,
+                  _C.blue,
+                  _C.yellow,
+                  Colors.pinkAccent,
+                  Colors.orangeAccent,
                 ],
               ),
             ),
@@ -731,9 +899,10 @@ void _selectOption(int index) {
     );
   }
 
-String _speechBubbleText() {
+  String _speechBubbleText() {
     switch (_phase) {
       case _Phase.intro:
+        if (_lesson.module == 'rhymes') return _lesson.prompt;
         return _lesson.module == 'alphabet'
             ? 'This is the letter ${_lesson.title}! Say it with me!'
             : 'Let\'s learn ${_lesson.title}!';
@@ -771,6 +940,10 @@ String _speechBubbleText() {
 
   // ── INTRO ──
   Widget _buildIntroContent() {
+    if (_lesson.module == 'rhymes') {
+      return _buildRhymeIntroContent();
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
       child: Column(
@@ -819,6 +992,82 @@ String _speechBubbleText() {
           const SizedBox(height: 16),
           _GreenButton(
             label: "I got it! Let's answer →",
+            onTap: _goToMcq,
+          ),
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+
+  // ── RHYME KARAOKE INTRO ──
+  Widget _buildRhymeIntroContent() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      child: Column(
+        children: [
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 600),
+              transitionBuilder: (Widget child, Animation<double> animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.05),
+                      end: Offset.zero,
+                    ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+                    child: ScaleTransition(
+                      scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+                        CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)
+                      ),
+                      child: child,
+                    ),
+                  ),
+                );
+              },
+              child: Container(
+                key: ValueKey(_letterIndex), // Triggers animation on line change
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                decoration: BoxDecoration(
+                  color: _C.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _C.blue.withValues(alpha: 0.15),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: _C.purple.withValues(alpha: 0.05),
+                      blurRadius: 40,
+                      spreadRadius: 10,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _lesson.prompt,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.nunito(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        color: _C.dark,
+                        height: 1.3,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _GreenButton(
+            label: _isLastLetter ? 'Finish rhyme! 🎉' : 'Next line →',
             onTap: _goToMcq,
           ),
           const SizedBox(height: 4),
