@@ -151,6 +151,7 @@ void didChangeDependencies() {
 late final AnimationController _bounceCtrl;
 late final Animation<double> _bounceY;
 late final ConfettiController _confettiController;
+late final AnimationController _bgCtrl;
 
 @override
 void initState() {
@@ -175,6 +176,11 @@ void initState() {
   _bounceCtrl.repeat(reverse: true);
 
   _confettiController = ConfettiController(duration: const Duration(seconds: 2));
+
+  _bgCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 10),
+  )..repeat(reverse: true);
 }
 
 /// Restores the next incomplete alphabet lesson index from Supabase metadata
@@ -540,6 +546,7 @@ Future<void> _speakIntro() async {
 void dispose() {
   _bounceCtrl.dispose();
   _confettiController.dispose();
+  _bgCtrl.dispose();
   super.dispose();
 }
 
@@ -645,11 +652,15 @@ void _selectOption(int index) {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _C.bg,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Column(
+      backgroundColor: moduleType == 'rhymes' ? Colors.transparent : _C.bg,
+      body: Stack(
+        children: [
+          // 1. Animated Rhyme Background (if applicable)
+          if (moduleType == 'rhymes') _buildRhymeBackground(),
+          
+          // 2. Main Content
+          SafeArea(
+            child: Column(
               children: [
                 _buildTopBar(),
                 Expanded(
@@ -664,7 +675,12 @@ void _selectOption(int index) {
                 ),
               ],
             ),
-            Align(
+            ),
+          ),
+          
+          // 3. Confetti Overlay
+          SafeArea(
+            child: Align(
               alignment: Alignment.topCenter,
               child: ConfettiWidget(
                 confettiController: _confettiController,
@@ -684,9 +700,80 @@ void _selectOption(int index) {
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildRhymeBackground() {
+    final rhymeId = _lesson.id.split('_line_').first;
+    List<Color> gradient;
+    IconData icon;
+    Color iconColor;
+
+    switch (rhymeId) {
+      case 'twinkle':
+        gradient = [const Color(0xFF1A237E), const Color(0xFF283593)];
+        icon = Icons.star_rounded;
+        iconColor = Colors.white.withValues(alpha: 0.15);
+        break;
+      case 'rain_rain':
+        gradient = [const Color(0xFFCFD8DC), const Color(0xFF90A4AE)];
+        icon = Icons.water_drop_rounded;
+        iconColor = Colors.white.withValues(alpha: 0.3);
+        break;
+      case 'baa_baa':
+        gradient = [const Color(0xFFE1F5FE), const Color(0xFFAED581)];
+        icon = Icons.cloud_rounded;
+        iconColor = Colors.white.withValues(alpha: 0.4);
+        break;
+      case 'humpty':
+        gradient = [const Color(0xFFFFCC80), const Color(0xFFEF9A9A)];
+        icon = Icons.wb_sunny_rounded;
+        iconColor = Colors.white.withValues(alpha: 0.2);
+        break;
+      case 'johny':
+      default:
+        gradient = [const Color(0xFFF8BBD0), const Color(0xFFFFF9C4)];
+        icon = Icons.favorite_rounded;
+        iconColor = Colors.white.withValues(alpha: 0.3);
+        break;
+    }
+
+    return AnimatedBuilder(
+      animation: _bgCtrl,
+      builder: (context, child) {
+        final val = _bgCtrl.value;
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradient,
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                left: MediaQuery.of(context).size.width * 0.15 + (val * 20),
+                top: MediaQuery.of(context).size.height * 0.1 + (val * 30),
+                child: Icon(icon, size: 80, color: iconColor),
+              ),
+              Positioned(
+                right: MediaQuery.of(context).size.width * 0.1 - (val * 15),
+                top: MediaQuery.of(context).size.height * 0.45 + (val * 20),
+                child: Icon(icon, size: 120, color: iconColor),
+              ),
+              Positioned(
+                left: MediaQuery.of(context).size.width * 0.35 + (val * 40),
+                bottom: MediaQuery.of(context).size.height * 0.15 - (val * 10),
+                child: Icon(icon, size: 60, color: iconColor),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
