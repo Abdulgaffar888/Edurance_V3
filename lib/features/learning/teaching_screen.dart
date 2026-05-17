@@ -41,7 +41,7 @@ class TeachingScreen extends StatefulWidget {
 }
 
 class _TeachingScreenState extends State<TeachingScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   // ── Lesson state
   int    _letterIndex    = 0;
   _Phase _phase          = _Phase.intro;
@@ -655,10 +655,7 @@ void _selectOption(int index) {
       backgroundColor: moduleType == 'rhymes' ? Colors.transparent : _C.bg,
       body: Stack(
         children: [
-          // 1. Animated Rhyme Background (if applicable)
           if (moduleType == 'rhymes') _buildRhymeBackground(),
-          
-          // 2. Main Content
           SafeArea(
             child: Column(
               children: [
@@ -675,10 +672,7 @@ void _selectOption(int index) {
                 ),
               ],
             ),
-            ),
           ),
-          
-          // 3. Confetti Overlay
           SafeArea(
             child: Align(
               alignment: Alignment.topCenter,

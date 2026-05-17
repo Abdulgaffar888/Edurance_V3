@@ -1,7 +1,6 @@
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
-
 import '../../core/router/app_router.dart';
 import '../../data/rhyme_data.dart';
 import '../../models/rhyme.dart';
