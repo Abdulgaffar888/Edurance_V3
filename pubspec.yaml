@@ -37,12 +37,6 @@ flutter:
     - assets/images/
     - assets/animations/
     - assets/fonts/
-
-flutter:
-
-  assets:
-    - assets/
-
   fonts:
     - family: Nunito
       fonts:
